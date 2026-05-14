@@ -41,7 +41,7 @@ Do not copy private root files such as `STATE.md`, private `README.md`, or zippe
 
 Required/desired store screenshots:
 
-- Popup page, resized/padded to 640×400.
-- Options page, resized/padded to 640×400.
+- Popup page, resized/padded to 640×400: assets/store-screenshot-popup-640x400.png.
+- Options page, resized/cropped to 640×400: assets/store-screenshot-options-640x400.png.
 
 Avoid exposing private URLs, internal site names, or sensitive bookmark names.

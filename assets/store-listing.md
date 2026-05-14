@@ -51,4 +51,4 @@ https://github.com/site-speed/EdgeTabGroupsBackup-extension/issues
 
 - Logo: `assets/store-logo-300.png` / `assets/extension-logo-300.png`
 - Popup screenshot: `assets/store-screenshot-popup-640x400.png`
-- Options screenshot: TODO after screenshot is captured and resized to 640×400.
+- Options screenshot: assets/store-screenshot-options-640x400.png

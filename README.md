@@ -19,7 +19,7 @@ Back up the **current Microsoft Edge window’s** tabs and tab groups into favou
 
 ![EdgeTabGroupsBackup popup](assets/store-screenshot-popup-640x400.png)
 
-_Options screenshot to be added before store submission._
+![EdgeTabGroupsBackup Options page](assets/store-screenshot-options-640x400.png)
 
 ## Destination discovery
 
