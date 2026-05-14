@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EdgeTabGroupsBackup",
-  "version": "0.4.9",
+  "version": "1.0.0",
   "description": "Back up the current window’s tabs and tab groups into favourites folders (with or without Edge Workspaces).",
   "action": {
     "default_title": "EdgeTabGroupsBackup",

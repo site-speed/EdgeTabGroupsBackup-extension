@@ -81,4 +81,4 @@ For workspace folders, cleanup removes direct child backup folders matching `Bac
 
 This extension runs locally and uses Edge/Chromium extension APIs to read tabs/tab groups and write bookmarks. See [PRIVACY.md](PRIVACY.md).
 
-Version: **v0.4.9**
+Version: **v1.0.0**
