@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EdgeTabGroupsBackup</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="headerRow">
+        <h1>EdgeTabGroupsBackup <span id="versionLabel" class="version"></span></h1>
+        <button id="openOptions" class="iconButton" title="Open options" aria-label="Open options">⚙</button>
+      </div>
+      <p class="sub">Back up the current window’s tabs &amp; tab groups.</p>
+    </header>
+
+    <section class="card">
+      <label for="workspaceSelect">Destination folder</label>
+      <select id="workspaceSelect"></select>
+      <p class="hint" id="containerHint"></p>
+      <p class="hint" id="previewHint"></p>
+    </section>
+
+    <section class="card">
+      <label for="windowLabelInput">Window label (optional)</label>
+      <div class="row compactRow">
+        <input id="windowLabelInput" class="textInput grow" type="text" placeholder="e.g. Daily, Research, Client X" autocomplete="off" />
+        <button id="setMarker" class="secondary">Set marker</button>
+      </div>
+      <p class="hint">Only used after Set marker succeeds.</p>
+    </section>
+
+    <section class="card">
+      <button id="runBackup" class="primary">Run backup now</button>
+      <div id="status" class="status" aria-live="polite"></div>
+      <div id="details" class="details"></div>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary>Diagnostics</summary>
+        <div class="muted" id="diagMode"></div>
+        <div class="muted" id="context"></div>
+        <p class="sub">If folders don’t appear, dump bookmark roots/tree and share the output.</p>
+        <div class="row">
+          <button id="diagRoots" class="secondary">Dump bookmark roots</button>
+          <button id="diagTree" class="secondary">Dump slim tree</button>
+        </div>
+        <textarea id="diagOut" class="diag" rows="8" spellcheck="false"></textarea>
+      </details>
+    </section>
+</div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

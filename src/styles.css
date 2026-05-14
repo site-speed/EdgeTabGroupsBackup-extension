@@ -1,0 +1,39 @@
+:root {
+  --bg: #0f172a;
+  --card: #111c33;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --accent: #60a5fa;
+  --accent2: #34d399;
+  --danger: #fb7185;
+  --border: #233152;
+}
+
+body { margin: 0; font: 13px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: var(--bg); color: var(--text); }
+.wrap { width: 360px; padding: 12px; }
+header h1 { font-size: 15px; margin: 0; }
+.headerRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.version { color: var(--muted); font-size: 11px; font-weight: 500; }
+.iconButton { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 15px; }
+.iconButton:hover { border-color: var(--accent); }
+.sub { margin: 0 0 10px; color: var(--muted); }
+.card { border: 1px solid var(--border); background: var(--card); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+label { display: block; color: var(--muted); margin-bottom: 6px; }
+select { width: 100%; padding: 8px; border-radius: 8px; background: #0b1223; border: 1px solid var(--border); color: var(--text); }
+.textInput { box-sizing: border-box; padding: 8px; border-radius: 8px; background: #0b1223; border: 1px solid var(--border); color: var(--text); }
+.grow { flex: 1; min-width: 0; }
+.compactRow { align-items: stretch; }
+.row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+button { cursor: pointer; border-radius: 8px; border: 1px solid var(--border); padding: 8px 10px; color: var(--text); background: #0b1223; }
+button.primary { width: 100%; background: linear-gradient(135deg, var(--accent), #7c3aed); border: none; font-weight: 600; }
+button.secondary:hover { border-color: var(--accent); }
+.hint { margin: 8px 0 0; color: var(--muted); font-size: 12px; white-space: pre-line; }
+.status { margin-top: 10px; color: var(--muted); }
+.details { margin-top: 8px; font-size: 12px; color: var(--muted); }
+.footnote { margin: 0; color: var(--muted); font-size: 12px; }
+.muted { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+textarea.diag { width: 100%; margin-top: 8px; padding: 8px; border-radius: 8px; background: #0b1223; border: 1px solid var(--border); color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 11px; }
+.ok { color: var(--accent2); }
+.err { color: var(--danger); }
+
+input:disabled { opacity: 0.65; cursor: not-allowed; }

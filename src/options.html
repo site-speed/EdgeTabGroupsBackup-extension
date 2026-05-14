@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EdgeTabGroupsBackup — Options</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main class="wrap">
+    <h1>EdgeTabGroupsBackup — Options</h1>
+    <p class="sub">Retention and maintenance settings for backups.</p>
+
+    <section class="card">
+      <h2>Backup settings</h2>
+      <label for="maxBackups">Maximum number of backups to keep <span class="muted">(per destination)</span></label>
+      <div class="row">
+        <input id="maxBackups" type="number" min="1" step="1" />
+      </div>
+      <label for="safeBackupFolderName">Default backup folder name <span class="muted">(under Other favourites / Other bookmarks)</span></label>
+      <input id="safeBackupFolderName" class="textInput wideInput" type="text" autocomplete="off" />
+      <div class="row">
+        <button id="save" class="primary">Save settings</button>
+      </div>
+      <p class="hint">The default folder is always listed in the popup, but it is only created the first time you use it as the backup destination. If you rename it here, an existing folder with the old name is renamed where possible.</p>
+      <div id="status" class="status" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <h2>Workspace folder cleanup</h2>
+      <p class="hint">Best-effort cleanup for workspace folders and the default backup folder under Other favourites. Workspace cleanup removes matching backup subfolders first; Edge may still block deletion of Workspace-managed empty folders.</p>
+      <label for="cleanupFolderSelect">Folder to clean/delete</label>
+      <select id="cleanupFolderSelect"></select>
+      <p class="hint" id="cleanupFolderInfo"></p>
+      <label for="cleanupConfirm">Type the exact folder name to enable cleanup</label>
+      <input id="cleanupConfirm" class="textInput wideInput" type="text" autocomplete="off" />
+      <div class="row">
+        <button id="cleanupRefresh" class="secondary">Refresh list</button>
+        <button id="cleanupDelete" class="dangerButton" disabled>Clean selected folder</button>
+      </div>
+      <div id="cleanupStatus" class="status" aria-live="polite"></div>
+      <textarea id="cleanupDetails" class="diag" rows="8" spellcheck="false"></textarea>
+    </section>
+  </main>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>
