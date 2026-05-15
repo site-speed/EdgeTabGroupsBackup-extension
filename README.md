@@ -55,6 +55,20 @@ The Options page includes cleanup tooling for:
 
 For workspace folders, cleanup removes direct child backup folders matching `Backup YYYY-mm-DD_hhMM` first, then only attempts to delete the selected workspace folder if it is empty. Edge may block deletion of Workspace-managed folders.
 
+## Install from Microsoft Edge Add-ons
+
+EdgeTabGroupsBackup is available from Microsoft Edge Add-ons:
+
+[https://microsoftedge.microsoft.com/addons/detail/mebpcikopeeofpoafoicajeniemckkdd](https://microsoftedge.microsoft.com/addons/detail/mebpcikopeeofpoafoicajeniemckkdd)
+
+To install from the Store:
+
+1. Open the Microsoft Edge Add-ons listing.
+2. Click **Get**.
+3. Confirm the installation prompt in Microsoft Edge.
+4. Pin EdgeTabGroupsBackup to the toolbar if you want quick access.
+5. Open the extension popup and run your first backup.
+
 ## Install (Developer mode)
 
 1. Download and unzip the release.
