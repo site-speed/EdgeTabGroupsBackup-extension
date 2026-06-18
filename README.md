@@ -1,5 +1,8 @@
 # EdgeTabGroupsBackup (Edge extension)
 
+<!-- start user badges -->
+<!-- end user badges -->
+
 Back up the **current Microsoft Edge window’s** tabs and tab groups into favourites/bookmarks.
 
 ## What it does
