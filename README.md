@@ -1,5 +1,9 @@
 # EdgeTabGroupsBackup (Edge extension)
 
+
+[![GitHub Release](https://img.shields.io/github/v/release/site-speed/EdgeTabGroupsBackup-extension?style=flat&color=blue)](https://github.com/site-speed/EdgeTabGroupsBackup-extension/releases/latest)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+![GitHub Repo stars](https://img.shields.io/github/stars/site-speed/EdgeTabGroupsBackup-extension)
 <!-- start user badges -->
 ![PRs opened in last 30 days](https://img.shields.io/badge/PRs%20opened%20in%20last%2030%20days-0-green?labelColor=555) ![PRs closed in last 30 days](https://img.shields.io/badge/PRs%20closed%20in%20last%2030%20days-0-red?labelColor=555) ![Open PRs](https://img.shields.io/badge/Open%20PRs-0-blue?labelColor=555)
 
