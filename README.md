@@ -24,6 +24,8 @@ Back up the **current Microsoft Edge window’s** tabs and tab groups into favou
 
 - Creates a backup folder named `Backup YYYY-mm-DD_hhMM` under the selected destination folder.
 - Optionally appends a label when explicitly set using a marker tab, for example `Backup YYYY-mm-DD_hhMM — Coding`.
+- Automatically selects a unique destination whose name exactly matches the marker label.
+- Detects an out-of-sync extension UI and background worker and offers a safe reload instead of using incomplete responses.
 - Saves:
   - ungrouped tabs as bookmarks;
   - each tab group as a subfolder containing that group’s tab bookmarks.
@@ -55,10 +57,13 @@ Browser extension APIs do not expose a reliable user-visible Edge window name, s
 - The **Window label (optional)** box is blank by default.
 - Click **Set marker** to create/update a pinned extension marker tab such as `[ETGB: Coding]`.
 - The marker tab is excluded from backups.
+- If exactly one listed destination has the same case-sensitive name as the marker, that destination is selected immediately and whenever the popup reopens.
+- The marker match takes priority over remembered manual selections. You can still choose another destination for the current open popup; reopening restores the marker match.
+- If multiple destinations have the same exact name, the extension does not guess and reports the ambiguity in Diagnostics.
 - Backup folder names only include an appended label when:
   - a marker tab exists; or
   - the window is InPrivate, in which case the fixed label is **In-Private**.
-- InPrivate marker controls are disabled because marker tabs cannot be reliably created there.
+- The fixed InPrivate label is not used for destination matching, and marker controls remain disabled there.
 
 ## Unsaved tabs
 
@@ -92,14 +97,14 @@ To install from the Store:
 1. Download and unzip the release.
 2. Open `edge://extensions/`.
 3. Enable **Developer mode**.
-4. Click **Load unpacked** and select the `public/` folder.
+4. Click **Load unpacked** and select the directory containing `manifest.json`.
 
 ## Use
 
 1. Open the window you want to back up.
 2. Open the extension popup.
-3. Select the destination folder.
-4. Optionally enter a window label and click **Set marker**.
+3. Optionally enter a window label and click **Set marker**. A unique exact-name destination match is selected automatically.
+4. Review or temporarily change the destination folder.
 5. Review the preview counts.
 6. Click **Run backup now**.
 
@@ -113,4 +118,4 @@ To install from the Store:
 
 This extension runs locally and uses Edge/Chromium extension APIs to read tabs/tab groups and write bookmarks. See [PRIVACY.md](PRIVACY.md).
 
-Version: **v1.0.0**
+Version: **v1.1.0**

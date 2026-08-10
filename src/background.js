@@ -1,10 +1,19 @@
-import { promisifyChrome, formatTimestampLocal, isInternalUrl, sanitizeFolderName, isWorkspaceContainerTitle, isSpecialTopLevelTitle, isBackupFolderTitle, backupTimestampKey } from './utils.js';
+import { promisifyChrome, formatTimestampLocal, isInternalUrl, sanitizeFolderName, normalizeSafeBackupFolderName, chooseDestination, isWorkspaceContainerTitle, isSpecialTopLevelTitle, isBackupFolderTitle, backupTimestampKey } from './utils.js';
+import { createRuntimeMetadata } from './runtime-protocol.js';
 
 const STORAGE_KEYS = { windowOverrides: 'windowOverrides', lastUsedWorkspaceId: 'lastUsedWorkspaceId', maxBackupsPerWorkspace: 'maxBackupsPerWorkspace', safeBackupFolderName: 'safeBackupFolderName' };
 const DEFAULT_MAX_BACKUPS = 5;
 const DEFAULT_SAFE_BACKUP_FOLDER_NAME = 'EdgeTabGroupsBackup';
 const SAFE_DESTINATION_ID = '__edge_tab_groups_backup_safe_destination__';
 const OTHER_BOOKMARKS_TITLES = ['other favourites', 'other favorites', 'other bookmarks'];
+
+function getRuntimeMetadata() {
+  return createRuntimeMetadata(chrome.runtime.getManifest().version);
+}
+
+function respond(sendResponse, payload) {
+  sendResponse({ ...payload, runtime: getRuntimeMetadata() });
+}
 
 async function getBookmarkTree() { return await promisifyChrome(chrome.bookmarks, 'getTree'); }
 
@@ -38,23 +47,32 @@ function findOtherBookmarksFolder(topLevelFolders) {
 
 async function getSafeBackupFolderNameSetting() {
   const store = await promisifyChrome(chrome.storage.local, 'get', [STORAGE_KEYS.safeBackupFolderName]);
-  const value = String(store[STORAGE_KEYS.safeBackupFolderName] || '').replace(/\s+/g, ' ').trim();
-  return value || DEFAULT_SAFE_BACKUP_FOLDER_NAME;
+  const stored = store[STORAGE_KEYS.safeBackupFolderName];
+  const normalized = normalizeSafeBackupFolderName(stored, DEFAULT_SAFE_BACKUP_FOLDER_NAME);
+  if (stored !== normalized) await promisifyChrome(chrome.storage.local, 'set', { [STORAGE_KEYS.safeBackupFolderName]: normalized });
+  return normalized;
 }
 
 async function setSafeBackupFolderNameSetting(newName) {
-  const cleaned = sanitizeFolderName(String(newName || '').replace(/\s+/g, ' ').trim()) || DEFAULT_SAFE_BACKUP_FOLDER_NAME;
+  const cleaned = normalizeSafeBackupFolderName(newName, DEFAULT_SAFE_BACKUP_FOLDER_NAME);
   const oldName = await getSafeBackupFolderNameSetting();
-  const top = await getTopLevelFolders();
-  const other = findOtherBookmarksFolder(top);
-  if (other && oldName !== cleaned) {
-    const children = await promisifyChrome(chrome.bookmarks, 'getChildren', other.id);
-    const oldFolder = children.find((n) => !n.url && n.title === oldName);
-    const newFolder = children.find((n) => !n.url && n.title === cleaned);
-    if (oldFolder && !newFolder) await promisifyChrome(chrome.bookmarks, 'update', oldFolder.id, { title: cleaned });
-  }
   await promisifyChrome(chrome.storage.local, 'set', { [STORAGE_KEYS.safeBackupFolderName]: cleaned });
-  return cleaned;
+  let warning = null;
+  if (oldName !== cleaned) {
+    try {
+      const top = await getTopLevelFolders();
+      const other = findOtherBookmarksFolder(top);
+      if (other) {
+        const children = await promisifyChrome(chrome.bookmarks, 'getChildren', other.id);
+        const oldFolder = children.find((n) => !n.url && n.title === oldName);
+        const newFolder = children.find((n) => !n.url && n.title === cleaned);
+        if (oldFolder && !newFolder) await promisifyChrome(chrome.bookmarks, 'update', oldFolder.id, { title: cleaned });
+      }
+    } catch (error) {
+      warning = `The setting was saved, but the existing folder could not be renamed: ${String(error?.message || error)}`;
+    }
+  }
+  return { value: cleaned, warning };
 }
 
 async function findSafeFolderUnderOther() {
@@ -116,20 +134,36 @@ async function setMaxBackupsSetting(n) {
   return v;
 }
 
-async function getWorkspaceIdForWindow(windowId) {
-  const store = await promisifyChrome(chrome.storage.local, 'get', [STORAGE_KEYS.windowOverrides, STORAGE_KEYS.lastUsedWorkspaceId]);
-  const overrides = store[STORAGE_KEYS.windowOverrides] || {};
-  const override = overrides[String(windowId)];
-  if (override) return override;
-  if (store[STORAGE_KEYS.lastUsedWorkspaceId]) return store[STORAGE_KEYS.lastUsedWorkspaceId];
-  return null;
+function getWindowStorageArea() {
+  return chrome.storage.session || chrome.storage.local;
+}
+
+async function getStoredDestinationPreferences(windowId) {
+  const windowStore = await promisifyChrome(getWindowStorageArea(), 'get', [STORAGE_KEYS.windowOverrides]);
+  const localStore = await promisifyChrome(chrome.storage.local, 'get', [STORAGE_KEYS.lastUsedWorkspaceId]);
+  const overrides = windowStore[STORAGE_KEYS.windowOverrides] || {};
+  return {
+    windowOverrideId: overrides[String(windowId)] || null,
+    lastUsedDestinationId: localStore[STORAGE_KEYS.lastUsedWorkspaceId] || null
+  };
 }
 
 async function setWindowOverride(windowId, workspaceFolderId) {
-  const store = await promisifyChrome(chrome.storage.local, 'get', [STORAGE_KEYS.windowOverrides]);
+  const storageArea = getWindowStorageArea();
+  const store = await promisifyChrome(storageArea, 'get', [STORAGE_KEYS.windowOverrides]);
   const overrides = store[STORAGE_KEYS.windowOverrides] || {};
   overrides[String(windowId)] = workspaceFolderId;
-  await promisifyChrome(chrome.storage.local, 'set', { [STORAGE_KEYS.windowOverrides]: overrides, [STORAGE_KEYS.lastUsedWorkspaceId]: workspaceFolderId });
+  await promisifyChrome(storageArea, 'set', { [STORAGE_KEYS.windowOverrides]: overrides });
+  await promisifyChrome(chrome.storage.local, 'set', { [STORAGE_KEYS.lastUsedWorkspaceId]: workspaceFolderId });
+}
+
+async function removeWindowOverride(windowId) {
+  const storageArea = getWindowStorageArea();
+  const store = await promisifyChrome(storageArea, 'get', [STORAGE_KEYS.windowOverrides]);
+  const overrides = store[STORAGE_KEYS.windowOverrides] || {};
+  if (!(String(windowId) in overrides)) return;
+  delete overrides[String(windowId)];
+  await promisifyChrome(storageArea, 'set', { [STORAGE_KEYS.windowOverrides]: overrides });
 }
 
 async function resolveDestinationFolderId(destinationId) {
@@ -239,6 +273,22 @@ async function setWindowMarker(windowId, label) {
   return { label: clean, tabId: created.id, updated: false };
 }
 
+async function resolveDestinationSelection(windowId, workspaces, safeDestinationId) {
+  const tabs = await promisifyChrome(chrome.tabs, 'query', { windowId });
+  const incognito = await isIncognitoWindow(windowId);
+  const labelInfo = await inferWindowLabel(windowId, tabs, null, incognito);
+  const preferences = await getStoredDestinationPreferences(windowId);
+  const selection = chooseDestination({
+    destinations: workspaces,
+    markerLabel: labelInfo.label,
+    markerSource: labelInfo.source,
+    windowOverrideId: preferences.windowOverrideId,
+    lastUsedDestinationId: preferences.lastUsedDestinationId,
+    safeDestinationId
+  });
+  return { ...selection, markerLabel: labelInfo.source === 'marker' ? labelInfo.label : null, markerSource: labelInfo.source };
+}
+
 async function countDirectChildren(folderId) {
   const children = await promisifyChrome(chrome.bookmarks, 'getChildren', folderId);
   return children.length;
@@ -305,7 +355,7 @@ async function backupWindowToWorkspace({ windowId, workspaceFolderId }) {
   const labelInfo = await inferWindowLabel(windowId, tabs, null, incognito);
   const windowLabel = labelInfo.label;
   const preview = computePreviewFromTabsAll(tabs);
-  const safeLabel = sanitizeFolderName(windowLabel || '');
+  const safeLabel = windowLabel ? sanitizeFolderName(windowLabel) : '';
   const backupFolderTitle = `Backup ${formatTimestampLocal(new Date())}${safeLabel ? ` — ${safeLabel}` : ''}`;
   const backupFolder = await createUniqueFolder(destinationFolderId, backupFolderTitle);
   const grouped = new Map();
@@ -346,85 +396,104 @@ function slimNode(n) {
   return out;
 }
 
+chrome.runtime.onInstalled.addListener(() => {
+  promisifyChrome(chrome.storage.local, 'remove', [STORAGE_KEYS.windowOverrides]).catch(() => {});
+});
+
+chrome.windows.onRemoved.addListener((windowId) => {
+  removeWindowOverride(windowId).catch(() => {});
+});
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     switch (msg?.type) {
+      case 'GET_RUNTIME_INFO': {
+        respond(sendResponse, { ok: true });
+        break;
+      }
       case 'GET_CONTEXT': {
         const windowId = msg.windowId;
-        const selectedWorkspaceId = windowId != null ? await getWorkspaceIdForWindow(windowId) : null;
         const { mode, container, workspaces, safeDestinationId } = await discoverWorkspaces();
+        const selection = windowId != null
+          ? await resolveDestinationSelection(windowId, workspaces, safeDestinationId)
+          : { selectedDestinationId: safeDestinationId, selectionSource: 'safe-default', markerMatchCount: 0, markerLabel: null, markerSource: 'none' };
         const maxBackups = await getMaxBackupsSetting();
         const safeBackupFolderName = await getSafeBackupFolderNameSetting();
         const incognito = await isIncognitoWindow(windowId);
-        sendResponse({ ok: true, windowId, selectedWorkspaceId, mode, container, workspaces, safeDestinationId, maxBackups, safeBackupFolderName, incognito });
+        respond(sendResponse, { ok: true, windowId, selectedWorkspaceId: selection.selectedDestinationId, selectionSource: selection.selectionSource, markerMatchCount: selection.markerMatchCount, markerLabel: selection.markerLabel, markerSource: selection.markerSource, mode, container, workspaces, safeDestinationId, maxBackups, safeBackupFolderName, incognito });
         break;
       }
       case 'GET_WORKSPACE_CONTAINER_FOLDERS': {
         const cleanup = await listWorkspaceContainerFolders();
-        sendResponse({ ok: true, ...cleanup });
+        respond(sendResponse, { ok: true, ...cleanup });
         break;
       }
       case 'DELETE_WORKSPACE_CONTAINER_FOLDER': {
         const result = await deleteWorkspaceContainerFolder(msg.folderId, msg.title);
-        sendResponse({ ok: true, result });
+        respond(sendResponse, { ok: true, result });
         break;
       }
       case 'PREVIEW_WINDOW': {
         const windowId = msg.windowId;
-        if (windowId == null) return sendResponse({ ok: false, error: 'Missing windowId for preview.' });
+        if (windowId == null) return respond(sendResponse, { ok: false, code: 'MISSING_WINDOW_ID', error: 'Missing windowId for preview.' });
         const tabs = await promisifyChrome(chrome.tabs, 'query', { windowId });
         const incognito = await isIncognitoWindow(windowId);
         const labelInfo = await inferWindowLabel(windowId, tabs, null, incognito);
-        sendResponse({ ok: true, preview: { ...computePreviewFromTabsAll(tabs), windowLabel: labelInfo.label, labelSource: labelInfo.source, incognito } });
+        respond(sendResponse, { ok: true, preview: { ...computePreviewFromTabsAll(tabs), windowLabel: labelInfo.label, labelSource: labelInfo.source, incognito } });
         break;
       }
       case 'SET_WINDOW_MARKER': {
         const windowId = msg.windowId;
-        if (windowId == null) return sendResponse({ ok: false, error: 'Missing windowId for marker.' });
+        if (windowId == null) return respond(sendResponse, { ok: false, code: 'MISSING_WINDOW_ID', error: 'Missing windowId for marker.' });
         const result = await setWindowMarker(windowId, msg.label);
-        sendResponse({ ok: true, result });
+        respond(sendResponse, { ok: true, result });
         break;
       }
       case 'GET_SETTINGS': {
-        sendResponse({ ok: true, maxBackups: await getMaxBackupsSetting(), safeBackupFolderName: await getSafeBackupFolderNameSetting() });
+        respond(sendResponse, { ok: true, maxBackups: await getMaxBackupsSetting(), safeBackupFolderName: await getSafeBackupFolderNameSetting() });
         break;
       }
       case 'SET_SETTINGS': {
         const maxBackups = await setMaxBackupsSetting(msg.maxBackups);
-        const safeBackupFolderName = await setSafeBackupFolderNameSetting(msg.safeBackupFolderName);
-        sendResponse({ ok: true, maxBackups, safeBackupFolderName });
+        const folderNameResult = await setSafeBackupFolderNameSetting(msg.safeBackupFolderName);
+        respond(sendResponse, { ok: true, maxBackups, safeBackupFolderName: folderNameResult.value, warning: folderNameResult.warning });
         break;
       }
       case 'SET_WINDOW_WORKSPACE': {
         const windowId = msg.windowId;
-        if (windowId == null) return sendResponse({ ok: false, error: 'Missing windowId for mapping.' });
+        if (windowId == null) return respond(sendResponse, { ok: false, code: 'MISSING_WINDOW_ID', error: 'Missing windowId for mapping.' });
         await setWindowOverride(windowId, msg.workspaceFolderId);
-        sendResponse({ ok: true });
+        respond(sendResponse, { ok: true });
         break;
       }
       case 'RUN_BACKUP': {
         const windowId = msg.windowId;
-        if (windowId == null) return sendResponse({ ok: false, error: 'Missing windowId for backup.' });
-        const workspaceFolderId = msg.workspaceFolderId || await getWorkspaceIdForWindow(windowId);
-        if (!workspaceFolderId) return sendResponse({ ok: false, error: 'No destination selected.' });
+        if (windowId == null) return respond(sendResponse, { ok: false, code: 'MISSING_WINDOW_ID', error: 'Missing windowId for backup.' });
+        let workspaceFolderId = msg.workspaceFolderId;
+        if (!workspaceFolderId) {
+          const { workspaces, safeDestinationId } = await discoverWorkspaces();
+          const selection = await resolveDestinationSelection(windowId, workspaces, safeDestinationId);
+          workspaceFolderId = selection.selectedDestinationId;
+        }
+        if (!workspaceFolderId) return respond(sendResponse, { ok: false, code: 'NO_DESTINATION', error: 'No destination selected.' });
         const result = await backupWindowToWorkspace({ windowId, workspaceFolderId });
         await promisifyChrome(chrome.storage.local, 'set', { [STORAGE_KEYS.lastUsedWorkspaceId]: workspaceFolderId });
-        sendResponse({ ok: true, result, workspaceFolderId });
+        respond(sendResponse, { ok: true, result, workspaceFolderId });
         break;
       }
       case 'DIAG_BOOKMARK_ROOTS': {
         const top = await getTopLevelFolders();
-        sendResponse({ ok: true, roots: top.map(slimNode) });
+        respond(sendResponse, { ok: true, roots: top.map(slimNode) });
         break;
       }
       case 'DIAG_BOOKMARK_TREE_SLIM': {
         const tree = await getBookmarkTree();
-        sendResponse({ ok: true, tree: slimNode(tree?.[0] || {}) });
+        respond(sendResponse, { ok: true, tree: slimNode(tree?.[0] || {}) });
         break;
       }
       default:
-        sendResponse({ ok: false, error: 'Unknown message type' });
+        respond(sendResponse, { ok: false, code: 'UNSUPPORTED_MESSAGE', error: 'Unknown message type', messageType: msg?.type || null });
     }
-  })().catch((err) => sendResponse({ ok: false, error: String(err?.message || err), detail: err }));
+  })().catch((err) => respond(sendResponse, { ok: false, code: 'UNHANDLED_ERROR', error: String(err?.message || err) }));
   return true;
 });

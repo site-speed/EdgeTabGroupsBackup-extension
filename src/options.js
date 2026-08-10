@@ -1,3 +1,5 @@
+import { RuntimeCompatibilityError, formatRuntimeCompatibilityError, sendCheckedMessage } from './runtime-protocol.js';
+
 const elMax = document.getElementById('maxBackups');
 const elSafeName = document.getElementById('safeBackupFolderName');
 const elStatus = document.getElementById('status');
@@ -7,9 +9,11 @@ const elCleanupInfo = document.getElementById('cleanupFolderInfo');
 const elCleanupConfirm = document.getElementById('cleanupConfirm');
 const btnCleanupRefresh = document.getElementById('cleanupRefresh');
 const btnCleanupDelete = document.getElementById('cleanupDelete');
+const btnReloadExtension = document.getElementById('reloadExtension');
 const elCleanupStatus = document.getElementById('cleanupStatus');
 const elCleanupDetails = document.getElementById('cleanupDetails');
 let cleanupFolders = [];
+let compatibilityBlocked = false;
 function setStatus(msg, kind='') {
   elStatus.textContent = msg;
   elStatus.className = `status ${kind}`;
@@ -18,11 +22,34 @@ function setCleanupStatus(msg, kind='') {
   elCleanupStatus.textContent = msg;
   elCleanupStatus.className = `status ${kind}`;
 }
-async function send(type, payload={}) { return await chrome.runtime.sendMessage({ type, ...payload }); }
+function setCompatibilityState(error) {
+  const message = formatRuntimeCompatibilityError(error);
+  compatibilityBlocked = true;
+  for (const control of [elMax, elSafeName, btnSave, elCleanupSelect, elCleanupConfirm, btnCleanupRefresh, btnCleanupDelete]) control.disabled = true;
+  btnReloadExtension.hidden = false;
+  setStatus(message, 'err');
+  setCleanupStatus(message, 'err');
+  return { ok: false, error: message, compatibilityError: true };
+}
+async function send(type, payload={}) {
+  try {
+    return await sendCheckedMessage(chrome.runtime, type, payload);
+  } catch (error) {
+    if (error instanceof RuntimeCompatibilityError) return setCompatibilityState(error);
+    throw error;
+  }
+}
+function validateSettingsResponse(response) {
+  if (!Number.isInteger(response?.maxBackups) || response.maxBackups < 1 || typeof response.safeBackupFolderName !== 'string' || !response.safeBackupFolderName.trim()) {
+    return setCompatibilityState(new RuntimeCompatibilityError('INVALID_SETTINGS_RESPONSE', 'The background worker returned incomplete settings.'));
+  }
+  return response;
+}
 async function load() {
   setStatus('Loading…');
   const res = await send('GET_SETTINGS');
   if (!res.ok) return setStatus(`Error: ${res.error}`, 'err');
+  if (!validateSettingsResponse(res).ok) return;
   elMax.value = res.maxBackups;
   elSafeName.value = res.safeBackupFolderName;
   setStatus('');
@@ -33,7 +60,7 @@ function selectedCleanupFolder() {
 function updateCleanupDeleteState() {
   const selected = selectedCleanupFolder();
   const typed = elCleanupConfirm.value;
-  btnCleanupDelete.disabled = !selected || typed !== selected.title;
+  btnCleanupDelete.disabled = compatibilityBlocked || !selected || typed !== selected.title;
   if (!selected) {
     elCleanupInfo.textContent = 'No folder selected.';
     return;
@@ -67,17 +94,19 @@ async function refreshCleanupFolders() {
   const count = res.folders?.length || 0;
   setCleanupStatus(count ? `Found ${count} folder${count === 1 ? '' : 's'} available for cleanup.` : 'No folders found for cleanup.');
 }
+btnReloadExtension.addEventListener('click', () => chrome.runtime.reload());
 btnSave.addEventListener('click', async () => {
   const maxBackups = Number(elMax.value);
   const safeBackupFolderName = elSafeName.value.trim();
   setStatus('Saving…');
   const res = await send('SET_SETTINGS', { maxBackups, safeBackupFolderName });
   if (!res.ok) return setStatus(`Error: ${res.error}`, 'err');
+  if (!validateSettingsResponse(res).ok) return;
   elMax.value = res.maxBackups;
   elSafeName.value = res.safeBackupFolderName;
-  setStatus('Saved ✅', 'ok');
+  setStatus(res.warning ? `Saved. ${res.warning}` : 'Saved ✅', res.warning ? 'err' : 'ok');
   await refreshCleanupFolders();
-  setTimeout(() => setStatus(''), 1500);
+  if (!res.warning) setTimeout(() => setStatus(''), 1500);
 });
 elCleanupSelect.addEventListener('change', updateCleanupDeleteState);
 elCleanupConfirm.addEventListener('input', updateCleanupDeleteState);
@@ -104,5 +133,13 @@ btnCleanupDelete.addEventListener('click', async () => {
   setCleanupStatus(`${folderText}${backupText}${warningText} ✅`, r.folderDeleteError ? 'err' : 'ok');
   elCleanupDetails.value = JSON.stringify(r, null, 2);
 });
-load().catch((e) => setStatus(`Error: ${e.message || e}`, 'err'));
-refreshCleanupFolders().catch((e) => setCleanupStatus(`Error: ${e.message || e}`, 'err'));
+async function init() {
+  const runtimeResponse = await send('GET_RUNTIME_INFO');
+  if (!runtimeResponse.ok) return;
+  await load();
+  await refreshCleanupFolders();
+}
+init().catch((e) => {
+  setStatus(`Error: ${e.message || e}`, 'err');
+  setCleanupStatus(`Error: ${e.message || e}`, 'err');
+});
